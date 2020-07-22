@@ -1,20 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { Fragment, useEffect, useState } from "react";
 import Container from "./Container";
 import Navbar from "./Navbar";
 import Web3 from "web3";
 import ChitFund from "../contracts/ChitFund.json";
-
-// string public fundName;
-//     uint256 public jackpot;
-//     uint256 public noOfInstallments;
-//     uint256 public noOfInvestors;
-//     address private manager;
-//     uint256 public fundBalance;
-//     uint256 public installmentAmount;
-//     uint256 public noOfInvestorsJoined;
-//     address payable private winner = address(0);
-//     uint256 private winnersBid = 0;
-//     uint256 private winnersAmount;
+import ChitFundFactory from "../contracts/ChitFundFactory.json";
+import Footer from "./Footer.js";
+import Home from "./Home.js";
+import {
+  BrowserRouter as Router,
+  Switch,
+  Route,
+  Redirect,
+} from "react-router-dom";
+import Loader from "./Loader";
+import About from "./About";
+import Aboutt from "./Aboutt";
 
 const App = () => {
   const [Loading, setLoading] = useState(true);
@@ -22,7 +22,12 @@ const App = () => {
   const [viewfund, setViewfund] = useState([]);
   const [fundName, setFundName] = useState("");
   const [account, setAccount] = useState("");
-
+  const [chitfundfactory, setChitfundfactory] = useState("");
+  const [factories, setFactories] = useState([]);
+  const [ChitFundFactorycount, setChitFundFactorycount] = useState(0);
+  const [Jackpot, setJackpot] = useState(0);
+  const [NoOfInstallments, setNoOfInstallments] = useState(0);
+  const [FundBalance, setFundBalance] = useState(0);
   useEffect(() => {
     loadWeb3();
     loadBlockchainData();
@@ -43,28 +48,71 @@ const App = () => {
 
   const loadBlockchainData = async () => {
     const web3 = window.web3;
-    // Load account
+
     const accounts = await web3.eth.getAccounts();
     setAccount(accounts[0]);
     const networkId = await web3.eth.net.getId();
     const networkData = ChitFund.networks[networkId];
+    const networkData2 = ChitFundFactory.networks[networkId];
     if (networkData) {
       const chitfundd = new web3.eth.Contract(
         ChitFund.abi,
         networkData.address
       );
+
+      const chitFundFactoryy = new web3.eth.Contract(
+        ChitFundFactory.abi,
+        networkData2.address
+      );
+
+      setChitfundfactory(chitFundFactoryy);
       setChitfund(chitfundd);
 
       const viewFund = await chitfundd.methods.viewFund().call();
+      const jackpot = await web3.utils.fromWei(viewFund[1], "ether");
+      const NoOfinstallments = await web3.utils.fromWei(viewFund[5], "ether");
+      const fundBalance = await web3.utils.fromWei(viewFund[4], "ether");
+      setJackpot(jackpot);
+      setNoOfInstallments(NoOfinstallments);
+      setFundBalance(fundBalance);
       setViewfund(viewFund);
 
-      // console.log(productCount);
-      // // Load products
-      // for (var i = 1; i <= productCount; i++) {
-      //   const product = await marketplace.methods.products(i).call();
-      //   products.push(product);
+      const chitfundcount = await chitFundFactoryy.methods
+        .ChitfundCount()
+        .call();
+      setChitFundFactorycount(chitfundcount);
+
+      // for (var i = 1; i <= chitfundcount; i++) {
+      //   const x = await chitFundFactoryy.methods.launchedChitfunds(i).call();
+      //   console.log(x);
+      //   factories.push(x);
       // }
-      // setproducts(products);
+      var a = new Array();
+      await chitFundFactoryy.events
+        .launchedChitfunds(
+          {
+            filter: {
+              myIndexedParam: [20, 23],
+              myOtherIndexedParam: "0x123456789...",
+            }, // Using an array means OR: e.g. 20 or 23
+            fromBlock: 0,
+          },
+          function (error, event) {
+            console.log(event);
+          }
+        )
+        .on("data", function (event) {
+          factories.push(event.returnValues);
+        })
+        .on("changed", function (event) {
+          // remove event from local database
+        })
+        .on("error", console.error);
+      setFactories(factories);
+      const x = [...factories];
+      console.log(factories);
+
+      // setJackpot(window.web3.utils.fromWei(viewfund[1], "ether"));
       setLoading(false);
     } else {
       window.alert("Chitfund contract not deployed to detected network.");
@@ -101,17 +149,6 @@ const App = () => {
       });
   };
 
-  // const checkManager = () => {
-  //   setLoading(true);
-  //   Chitfund.methods
-  //     .checkManager()
-  //     .send({ from: account })
-  //     .once("recepient", (recepient) => {
-  //       setLoading(false);
-  //       console.log(recepient);
-  //     });
-  // };
-
   const releaseFund = () => {
     setLoading(true);
     Chitfund.methods
@@ -132,30 +169,86 @@ const App = () => {
       });
   };
 
+  const createChitFund = (name, amount, installments, participants) => {
+    console.log(name);
+    console.log(amount);
+    console.log(installments);
+    console.log(participants);
+    setLoading(true);
+    chitfundfactory.methods
+      .createFund(name, amount, installments, participants)
+      .send({ from: account })
+      .once("recepient", async (recepient) => {
+        // await chitfundfactory.launchedChitfunds().sendTransaction();
+
+        setLoading(false);
+      });
+  };
+
   return (
-    <div>
-      <Navbar account={account} />
-      <div className="container-fluid mt-5">
-        <div className="row">
-          <main role="main" className="col-lg-12 d-flex">
-            {Loading ? (
-              <div id="loader" className="text-center">
-                <p className="text-center">Loading...</p>
-              </div>
-            ) : (
-              <Container
-                viewfund={viewfund}
-                joinFund={joinFund}
-                contribute={contribute}
-                getWinner={getWinner}
-                releaseFund={releaseFund}
-                bidForProject={bidForJackpot}
-              />
-            )}
-          </main>
+    <Router>
+      <div className="App">
+        <Navbar account={account} viewfund={viewfund} />
+        <div className="container-fluid mt-5">
+          <div className="row">
+            <div>
+              <Switch>
+                {/* {Loading ? (
+                <Loader viewfund={viewfund} />
+              ) : ( */}
+
+                <Route
+                  exact
+                  path="/"
+                  render={(props) => (
+                    <Fragment>
+                      <Home
+                        viewfund={viewfund}
+                        bidForJackpot={bidForJackpot}
+                        releaseFund={releaseFund}
+                        getWinner={getWinner}
+                        contribute={contribute}
+                        joinFund={joinFund}
+                        factories={factories}
+                        jackpot={Jackpot}
+                        NoOfInstallments={NoOfInstallments}
+                        FundBalance={FundBalance}
+                      />
+                      <Footer />
+                    </Fragment>
+                  )}
+                />
+                <Route
+                  exact
+                  path="/about"
+                  render={(props) => (
+                    <Fragment>
+                      <About
+                        createChitFund={createChitFund}
+                        ChitFundFactorycount={ChitFundFactorycount}
+                        account={account}
+                        factories={factories}
+                      />
+                      <Footer />
+                    </Fragment>
+                  )}
+                />
+                <Route
+                  exact
+                  path="/aboutt"
+                  render={(props) => (
+                    <Fragment>
+                      <Aboutt />
+                    </Fragment>
+                  )}
+                />
+                {/* )} */}
+              </Switch>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </Router>
   );
 };
 
